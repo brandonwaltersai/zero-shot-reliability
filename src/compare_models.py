@@ -17,22 +17,31 @@ MODELS = {
 def compare_models(
     images: list[Image.Image],
     labels: list[str],
-    expected_by_image: dict[int, list[str]] | None = None,
+    expected_by_image: dict[str, list[str]] | None = None,
     model_ids: dict[str, str] | None = None,
+    image_names: list[str] | None = None,
 ) -> pd.DataFrame:
+    """`image_names`, if given, must be the same length as `images` and is used both as
+    the "image" column and as the `expected_by_image` lookup key -- keying by identity
+    rather than position, so results stay correct if callers ever reorder `images`.
+    """
     model_ids = model_ids or MODELS
     expected_by_image = expected_by_image or {}
+    if image_names is not None and len(image_names) != len(images):
+        raise ValueError(f"image_names has {len(image_names)} entries, images has {len(images)}.")
+    names = image_names if image_names is not None else [str(i) for i in range(1, len(images) + 1)]
+
     rows = []
     for model_key, model_id in model_ids.items():
-        for i, img in enumerate(images, start=1):
+        for name, img in zip(names, images):
             df = run_zero_shot(img, labels, model_id=model_id)
             metrics = confidence_metrics(df)
             top1_label = df.loc[0, "label"]
-            expected = expected_by_image.get(i, [])
+            expected = expected_by_image.get(name, [])
             rows.append(
                 {
                     "model": model_key,
-                    "image": i,
+                    "image": name,
                     "top1_label": top1_label,
                     "top1_score": round(metrics["top1"], 4),
                     "gap": round(metrics["gap"], 4),

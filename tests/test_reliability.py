@@ -85,3 +85,52 @@ def test_mismatched_labels_experiment_reproduces_documented_failure():
         assert 0.0 <= r["metrics"]["top1"] <= 1.0
     missed_guardrail = [r for r in results.values() if not r["flags"]["needs_review"]]
     assert len(missed_guardrail) >= 1
+
+
+@pytest.mark.slow
+def test_compare_models_keys_results_by_image_identity_not_position():
+    """Regression test for a real bug this caught on review: compare_models used to key
+    expected_by_image by integer position, which would silently misalign if images were
+    ever reordered. Real CLIP (patch32 only, already cached), 2 real images, network required."""
+    from src.compare_models import compare_models
+    from src.images import load_images_from_urls
+    from src.experiments import IMAGE_URLS
+
+    names = ["dog", "cat"]  # deliberately reversed vs. IMAGE_URLS insertion order
+    images, _ = load_images_from_urls([IMAGE_URLS[n] for n in names])
+    df = compare_models(
+        images,
+        ["cat", "dog", "car"],
+        expected_by_image={"cat": ["cat"], "dog": ["dog"]},
+        model_ids={"clip-vit-base-patch32": "openai/clip-vit-base-patch32"},
+        image_names=names,
+    )
+    assert set(df["image"]) == {"cat", "dog"}
+    assert df.set_index("image").loc["dog", "correct"]
+    assert df.set_index("image").loc["cat", "correct"]
+
+
+@pytest.mark.slow
+def test_compare_models_rejects_mismatched_image_names_length():
+    from src.compare_models import compare_models
+    from src.images import load_images_from_urls
+    from src.experiments import IMAGE_URLS
+
+    images, _ = load_images_from_urls([IMAGE_URLS["cat"]])
+    with pytest.raises(ValueError):
+        compare_models(images, ["cat", "dog"], image_names=["cat", "dog"])
+
+
+@pytest.mark.slow
+def test_label_sensitivity_experiment_shows_near_miss_effect_on_at_least_one_subject():
+    """Regression test for the label-sensitivity finding: real CLIP (patch32), 3 real
+    images x 2 label sets each, network required."""
+    from src.experiments import run_label_sensitivity
+
+    results = run_label_sensitivity()
+    assert set(results.keys()) == {"cat", "dog", "elephant"}
+    for r in results.values():
+        assert 0.0 <= r["coarse"]["top1"] <= 1.0
+        assert 0.0 <= r["near_miss"]["top1"] <= 1.0
+    confidence_dropped = [name for name, r in results.items() if r["near_miss"]["top1"] < r["coarse"]["top1"]]
+    assert len(confidence_dropped) >= 1

@@ -23,7 +23,10 @@ COARSE_LABELS = [
     "tiger", "lion", "house pet", "wild animal", "vehicle", "food",
 ]
 
-EXPECTED_BY_IMAGE = {1: ["cat"], 2: ["dog"], 3: ["airplane"], 4: ["car"], 5: ["pizza"], 6: ["elephant"]}
+EXPECTED_BY_IMAGE = {
+    "cat": ["cat"], "dog": ["dog"], "airliner": ["airplane"],
+    "cab": ["car"], "pizza": ["pizza"], "elephant": ["elephant"],
+}
 
 NEAR_MISS_LABELS = {
     "cat": ["tabby cat", "house cat", "domestic cat", "kitten", "calico cat",
@@ -40,9 +43,10 @@ MISMATCHED_LABELS = ["car", "airplane", "building", "mountain", "ocean", "furnit
 
 def run_model_comparison():
     """Experiment 1: two CLIP checkpoints, six diverse images, coarse labels."""
-    images, _ = load_images_from_urls(list(IMAGE_URLS.values()))
+    image_names = list(IMAGE_URLS.keys())
+    images, _ = load_images_from_urls([IMAGE_URLS[name] for name in image_names])
     labels = validate_candidate_labels(COARSE_LABELS)
-    return compare_models(images, labels, expected_by_image=EXPECTED_BY_IMAGE)
+    return compare_models(images, labels, expected_by_image=EXPECTED_BY_IMAGE, image_names=image_names)
 
 
 def run_label_sensitivity():

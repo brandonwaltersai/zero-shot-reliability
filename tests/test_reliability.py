@@ -70,3 +70,18 @@ def test_run_zero_shot_end_to_end():
     df = run_zero_shot(images[0], ["cat", "dog", "car"])
     assert df.iloc[0]["label"] == "cat"
     assert df.iloc[0]["score"] > 0.5
+
+
+@pytest.mark.slow
+def test_mismatched_labels_experiment_reproduces_documented_failure():
+    """Regression test for the documented finding: real CLIP (patch32), 3 real images,
+    network required. Confirms at least one confidently-wrong case still evades the
+    default guardrail -- if this ever stops being true, the README's claim is stale."""
+    from src.experiments import run_mismatched_labels
+
+    results = run_mismatched_labels()
+    assert set(results.keys()) == {"cat", "dog", "elephant"}
+    for r in results.values():
+        assert 0.0 <= r["metrics"]["top1"] <= 1.0
+    missed_guardrail = [r for r in results.values() if not r["flags"]["needs_review"]]
+    assert len(missed_guardrail) >= 1

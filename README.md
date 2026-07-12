@@ -15,14 +15,24 @@ list, and compute confidence-gap and entropy metrics across the *full*
 score distribution — not just the top-1 label, which hides how close the
 model actually was to picking something else.
 
-### The finding
-Swapping a coarse label set for ten overlapping near-miss labels on the
-**same photo, same model** drops top-1 confidence from 0.94 to 0.52 and
-quadruples entropy. Worse: when the true class is missing from the label
-set entirely, the model still returns a confident-looking wrong answer
-(0.509) that clears the default confidence guardrail — meaning
-threshold-based flagging catches genuine ambiguity but not an incomplete
-label taxonomy, which needs a different check entirely.
+### `src/experiments.py`
+Three experiments across **six diverse images** and two CLIP checkpoints
+(not a single cat photo) — model comparison, label sensitivity, and an
+incomplete-label-set failure mode. Every number in `docs/results.md`
+traces to this file (`python -m src.experiments` reproduces it exactly).
+
+### The findings
+Near-miss labels (e.g. ten overlapping cat-breed terms instead of 12
+broad categories) tank confidence and roughly double entropy on 2 of 3
+tested subjects — but barely move it on the third, so **the effect size
+depends on the image, not a universal law of "more labels = more
+confusion."** Separately: when the true class is missing from the label
+set entirely, the model still returns confident-looking wrong answers —
+one at **80.5% confidence** (a dog photo labeled "airplane") — and the
+default confidence guardrail misses 2 of 3 such cases. Threshold-based
+flagging catches genuine ambiguity; it does not reliably catch an
+incomplete label taxonomy, because there's no signal inside the model's
+own confidence score that distinguishes the two failure modes.
 
 **Full experiment writeup: [`docs/results.md`](docs/results.md).**
 
